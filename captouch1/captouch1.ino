@@ -19,31 +19,28 @@
 
 #include "ExponentialSmooth.h"
 #include "CrossOverDetect.h"
+#include "CapTouchCrossover.h"
 #include "tired_of_serial.h"
 
 CrossOverDetect<ExponentialSmooth> cap(40, new ExponentialSmooth(50), new ExponentialSmooth(20), 1); // start at +1
 
 const int CapScale = 400;
-const int Touch = A1;
+
+CapTouchCrossover touch1(A0, 20, 50, 10);
 
 void setup() {
   Serial.begin(115200);
   Serial.println("\nStart");
 
-  cap.v1.reset( cap.v2.reset(analogRead(Touch)) ); // initial value
+  touch1.setup();
 }
 
 void loop() {
-    int v = analogRead(Touch);
-    cap.v1.average( v );
-    cap.v2.average( v );
+    int v = touch1.read();
 
     ////print( v );print(" ");
-    print( cap.on() * CapScale );print(" ");
-    print( (int) (cap.changed() * CapScale * 1.1) );print(" ");
-    print( cap.v1.value() );print(" ");
-    print( cap.v2.value() );print(" ");
-    print( cap.v1.value() - cap.v2.value() );print(" ");
+    touch1.debug_print();
+    print( (int) (touch1.crossover.changed() * 20) );print(" ");
     println();
 
     //delay(10);

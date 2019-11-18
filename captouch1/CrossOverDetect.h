@@ -1,3 +1,5 @@
+#pragma once
+
 template <typename T>
 class CrossOverDetect {
 /* Detects when 2 values cross (by at least some delta), and tracks the state
@@ -34,6 +36,21 @@ class CrossOverDetect {
     // convenience if state == 1, i.e. if v1 > v2
     return state() == 1;
     }
+
+  boolean off() {
+    // convenience if state == -1, i.e. if v1 < v2
+    // NB: remember we can be in state 0: indeterminate
+    return state() == -1;
+    }
+
+  boolean d_on() {
+    // true only once when change to on
+    return state() == 1 && changed(); // relies on short-circuit
+  }
+  boolean d_off() {
+    // true only once when change to off
+    return state() == -1 && changed(); // relies on short-circuit
+  }
 
   boolean changed() {
     boolean temp = _changed;

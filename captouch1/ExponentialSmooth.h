@@ -1,3 +1,5 @@
+#pragma once
+
 class ExponentialSmooth {
   // a simple formula to sort-of do averaging: exponential smoothing
 
