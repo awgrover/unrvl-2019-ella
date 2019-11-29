@@ -1,2 +1,5 @@
+Use the UNO's cap-touch (analogRead()) reliably with long leads.
+Send message to processing.
+
 See the commonmode/ folder.
 Others are other attempts, experiments.
