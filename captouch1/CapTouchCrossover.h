@@ -14,7 +14,7 @@ class CapTouchCrossover {
 
   When the 2 cross (because the slower lags behind), we call it a "change": i.e. a touch/release.
 
-  This seems to work pretty well for the unu-analogRead/captouch (after
+  This seems to work pretty well for the uno-analogRead/captouch (after
   tuning resistor values, etc.).
 
   You still have to provide some tuning parameters:
@@ -71,7 +71,7 @@ class CapTouchCrossover {
   }
 
   int read() {
-    int v = analogRead(pin);
+    int v = analogRead(pin) - analogRead(A5);
     crossover.v1.average( v );
     crossover.v2.average( v );
     return v; // convenience
@@ -100,8 +100,8 @@ class CapTouchCrossover {
     // NB: you supply trailing Serial.println() !
     // NB: Do your Serial.begin()!
     Serial.print( touching() * 10 + not_touching() * -10 + 1);Serial.print(" "); // x 10 so you can see it in a plot, +1 vs 0 for indeterminate
-    Serial.print( crossover.v1.value() );Serial.print(" ");
-    Serial.print( crossover.v2.value() );Serial.print(" ");
+    Serial.print( crossover.v1.value() - 50 );Serial.print(" ");
+    Serial.print( crossover.v2.value() - 50 );Serial.print(" ");
     Serial.print( crossover.v1.value() - crossover.v2.value() );Serial.print(" "); // the measured delta
   }
 

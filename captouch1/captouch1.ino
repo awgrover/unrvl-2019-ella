@@ -27,6 +27,7 @@ CrossOverDetect<ExponentialSmooth> cap(40, new ExponentialSmooth(50), new Expone
 const int CapScale = 400;
 
 CapTouchCrossover touch1(A0, 20, 50, 10);
+//CapTouchCrossover touch1(A0, 20, 50, 10);
 
 void setup() {
   Serial.begin(115200);
@@ -39,6 +40,7 @@ void loop() {
     int v = touch1.read();
 
     ////print( v );print(" ");
+    print(75);print(" ");
     touch1.debug_print();
     print( (int) (touch1.crossover.changed() * 20) );print(" ");
     println();
