@@ -1,3 +1,32 @@
+/*
+  For 5 cap touch pins on an UNO,
+  where the leads are long, and thus act like an antenna (and high cap-value),
+  and the ends are objects with large surface.
+
+  This sketch based on the behavior I saw when I had long leads taped to a table
+  with some objects on the end.
+  The long-leads act like antennas, and pick up the 60Hz power signal.
+  So, I track the peak during each 1/60 sec and use that as the cap-value.
+  When I touched the _bare_ conductor, the counts jumped to 1024, from about 300.
+  But, also, the untouched value would move around a bit depending on where my arm was, etc,
+  so the common-mode lead (A5) is used as a reference: assume "touched" is about 70% of the 
+  difference from common-mode to 1024.
+
+  Sends 0+ (1+ 2+ etc) as each pin is touched, and 0-, 1-, etc when released.
+  Intended for use with processing.
+  Debounce might be needed, check behavior.
+
+  Wiring:
+    Each pin A0..A4
+    10Mohm gnd->pin. pin->lead->object. Might be able to change this to get a larger jump on touch.
+    Pin A5 is the same, but no object, we use it as a reference.
+
+  Calibration:
+    Several values are empirically determined.
+    Run the loop() with only the plot_loop() enabled, and check the behavior.
+    Key things are the TouchedValue and on_threshold_ratio
+*/
+
 #include "tired_of_serial.h"
 #include "PeakTrack.h"
 #include "HzMax.h"
@@ -6,22 +35,41 @@
 // magic for array size:
 template <typename T,unsigned S> inline constexpr unsigned arraysize(const T (&v)[S]) { return S; };
 
-int Touches[] = { A0, A1, A2, A3, A4 }; // touch pins to scan
-constexpr int TouchesCount = arraysize(Touches);
-const char TouchLetter = '0'; // A0='0', A1='1', etc. Sent to serial port
-const int Common = A5; // un attached reference antenna
-HzMax *hzmax[ TouchesCount ];
-OnChange *on_change[ TouchesCount ];
-// Our long-lead touch wire acts like an antenna and picks up the 60Hz power
-// So, the period is 1/60 *1000ms * 1.1fuzz
+// THINGS TO SET
+
+// To determine value: use  plot_loop() and adjust till the commonmode value is near the other pins.
+const float commonmode_ratio = 1.8; // the commonmode antenna is "smaller" than the real ones, about 30%
+
+// To determine value: use plot_loop() and see what happens on touch.
+const int TouchedValue = 1000; // empirically
+
+// To determine value: use plot_loop() and see where the threshold line compares with touched values
+// threshold is the last value.
+// Needs to be large enough that environment changes (your arm) don't exceed the threshold,
+// but small enough that a touch still works.
+const float on_threshold_ratio = 0.60; // of the TouchedValue, to count as touched. 1/2 isn't enough. .7 is unstable
+
+// Might adjust the time-window that we look for a max during. Longer shouldn't break it,
+// though it might make it a bit slower to respond to changes.
+// At least 1/60 sec so we try to catch at least on peak.
+// Beta is the amount of averaging, roughly n samples averaged together.
 const int HzPeriod = 1/60.0 * 1000 * 1.1; //rounded is fine. make sure we catch at least 1 peak
 const int HzMaxBeta = 3; // we don't seem to need much averaging
+
+// Pins
+int Touches[] = { A0, A1, A2, A3, A4 }; // touch pins to scan (automagic length detect)
+const int Common = A5; // un attached reference antenna
+
+constexpr int TouchesCount = arraysize(Touches);
+const char TouchLetter = '0'; // A0='0', A1='1', etc. Sent to serial port
+HzMax *hzmax[ TouchesCount ];
+OnChange *on_change[ TouchesCount ];
+
+// Our long-lead touch wire acts like an antenna and picks up the 60Hz power
+// So, the period is 1/60 *1000ms * 1.1fuzz
 // "commonmode" serves as a reference base value
-HzMax commonmode( HzPeriod, 20);
-const float commonmode_ratio = 1.8; // the commonmode antenna is "smaller" than the real ones, about 30%
+HzMax commonmode( HzPeriod, 20); // a beta to smooth it a lot
 int on_threshold; // dynamically from commonmode
-const float on_threshold_ratio = 0.60; // of the TouchedValue, to count as touched. 1/2 isn't enough. .7 is unstable
-const int TouchedValue = 1000; // empirically
 
 void setup() {
   Serial.begin(115200);
@@ -33,15 +81,18 @@ void hzmax_setup() {
     hzmax[pin_i] = new HzMax( HzPeriod, HzMaxBeta );
     on_change[pin_i] = new OnChange();
   }
+
+  // maybe readpins() for 1 sec to stabilize?
 }
 
 void loop() {
-  //plot_loop();
-  plot_on_loop();
-  //touched_loop();
+  //plot_loop(); // see the values we are testing against, esp on_threshold
+  //plot_on_loop(); // watch the touch as a graph, easier to see 
+  touched_loop();
 }
 
 void touched_loop() {
+  // the described protocol, sends "0+" etc when touched
   read_pins();
   for (int pin_i=0; pin_i<TouchesCount; pin_i++) {
     boolean on = hzmax[pin_i]->value() > on_threshold;
@@ -52,6 +103,7 @@ void touched_loop() {
 }
 
 void plot_on_loop() {
+  // 2nd most useful plotting for debugging, just to see the touched/release happen
   read_pins();
   for (int pin_i=0; pin_i<TouchesCount; pin_i++) {
   //for (int pin_i=2; pin_i<3; pin_i++) {
@@ -66,6 +118,9 @@ void plot_on_loop() {
 }
 
 void plot_loop() {
+  // most useful plotting for debugging/calibrating.
+  // Order of plot:
+  // commonmode, a0,a1,a2,a3,a4, 1026-mark, threshold-for-on
   read_pins();
   print(commonmode.value());print(" ");
   for (int pin_i=0; pin_i<TouchesCount; pin_i++) {
@@ -78,6 +133,7 @@ void plot_loop() {
 }
 
 void timeread_loop() {
+  // development: to check that read_pins() isn't too slow.
   unsigned long top = millis();
   for(int i=0;i<1000;i++) {
     read_pins();
@@ -102,6 +158,7 @@ void read_pins() {
 }
 
 void hzmax_loop() {
+  // development: one value pin, to play with resistor value.
   // 10Mohm. 450|1000 750 not quite touching. beta of 2 is plenty
   const int Pin = A0;
   static HzMax hz(1000/60, 2);
@@ -116,6 +173,7 @@ void hzmax_loop() {
   
 
 void peak_loop() {
+  // development: checking use of the PeakTrack class, which I decided not to use
   // using the peak/decay class
   // works ok, slow off
   // 10Mohm 100|300
