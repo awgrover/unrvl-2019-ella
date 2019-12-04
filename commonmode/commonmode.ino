@@ -28,9 +28,9 @@
 */
 
 #include "tired_of_serial.h"
-#include "PeakTrack.h"
 #include "HzMax.h"
 #include "OnChange.h"
+#include "CrossOverDetect.h"
 
 // magic for array size:
 template <typename T, unsigned S> inline constexpr unsigned arraysize(const T (&v)[S]) {
@@ -75,7 +75,8 @@ int on_threshold; // dynamically from commonmode
 
 void setup() {
   Serial.begin(115200);
-  hzmax_setup();
+  //hzmax_setup();
+  xover_setup();
 }
 
 void hzmax_setup() {
@@ -90,8 +91,25 @@ void hzmax_setup() {
 void loop() {
   //plot_a0_loop(); // raw
   //plot_loop(); // see the values we are testing against, esp on_threshold
+  plot_xover_loop();
   //plot_on_loop(); // watch the touch as a graph, easier to see
-  touched_loop();
+  //touched_loop();
+}
+
+CrossOverDetect<HzMax, ExponentialSmooth> *xover[ TouchesCount ];
+const int XOverSlowBeta = 20; // some multiple of HzMaxBeta
+void xover_setup() {
+  for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
+    // track peak
+    HzMax *hzmax = new HzMax( HzPeriod, HzMaxBeta );
+    // track slow peak
+    ExponentialSmooth *slowMax = new ExponentialSmooth( XOverSlowBeta ); // we'll have to update this as xover[].v2.
+    // add to crossover detect
+    xover[pin_i] = new CrossOverDetect<HzMax, ExponentialSmooth>( hzmax, slowMax );
+  }
+}
+
+void plot_xover_loop() {
 }
 
 void touched_loop() {
@@ -177,28 +195,5 @@ void hzmax_loop() {
 
   print(v); print(" ");
   print("0 1000");
-  println();
-}
-
-
-void peak_loop() {
-  // development: checking use of the PeakTrack class, which I decided not to use
-  // using the peak/decay class
-  // works ok, slow off
-  // 10Mohm 100|300
-  const int Pin = A0;
-  static PeakTrack a0(200);
-  const float CommonEx = 1.4;
-
-  int common = analogRead(Common);
-  int pin = analogRead(Pin);
-
-  a0.update( pin - (common * CommonEx) );
-
-  print(800); print(" ");
-  //print(common);print(" ");
-  //print(pin);print(" ");
-  //print(pin-(common * CommonEx));print(" ");
-  print(a0.value()); print(" ");
   println();
 }
