@@ -9,7 +9,7 @@
   So, I track the peak during each 1/60 sec and use that as the cap-value.
   When I touched the _bare_ conductor, the counts jumped to 1024, from about 300.
   But, also, the untouched value would move around a bit depending on where my arm was, etc,
-  so the common-mode lead (A5) is used as a reference: assume "touched" is about 70% of the 
+  so the common-mode lead (A5) is used as a reference: assume "touched" is about 70% of the
   difference from common-mode to 1024.
 
   Sends 0+ (1+ 2+ etc) as each pin is touched, and 0-, 1-, etc when released.
@@ -33,7 +33,9 @@
 #include "OnChange.h"
 
 // magic for array size:
-template <typename T,unsigned S> inline constexpr unsigned arraysize(const T (&v)[S]) { return S; };
+template <typename T, unsigned S> inline constexpr unsigned arraysize(const T (&v)[S]) {
+  return S;
+};
 
 // THINGS TO SET
 
@@ -41,20 +43,20 @@ template <typename T,unsigned S> inline constexpr unsigned arraysize(const T (&v
 const float commonmode_ratio = 1.8; // the commonmode antenna is "smaller" than the real ones, about 30%
 
 // To determine value: use plot_loop() and see what happens on touch.
-const int TouchedValue = 1000; // empirically
+const int TouchedValue = 230; // empirically
 
 // To determine value: use plot_loop() and see where the threshold line compares with touched values
 // threshold is the last value.
 // Needs to be large enough that environment changes (your arm) don't exceed the threshold,
 // but small enough that a touch still works.
-const float on_threshold_ratio = 0.60; // of the TouchedValue, to count as touched. 1/2 isn't enough. .7 is unstable
+const float on_threshold_ratio = .06; // of the TouchedValue, to count as touched. 1/2 isn't enough. .7 is unstable
 
 // Might adjust the time-window that we look for a max during. Longer shouldn't break it,
 // though it might make it a bit slower to respond to changes.
 // At least 1/60 sec so we try to catch at least on peak.
 // Beta is the amount of averaging, roughly n samples averaged together.
-const int HzPeriod = 1/60.0 * 1000 * 1.1; //rounded is fine. make sure we catch at least 1 peak
-const int HzMaxBeta = 3; // we don't seem to need much averaging
+const int HzPeriod = 1 / 60.0 * 1000 * 1.1; //rounded is fine. make sure we catch at least 1 peak
+const int HzMaxBeta = 5; // we don't seem to need much averaging
 
 // Pins
 int Touches[] = { A0, A1, A2, A3, A4 }; // touch pins to scan (automagic length detect)
@@ -77,7 +79,7 @@ void setup() {
 }
 
 void hzmax_setup() {
-  for (int pin_i=0; pin_i<TouchesCount; pin_i++) {
+  for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
     hzmax[pin_i] = new HzMax( HzPeriod, HzMaxBeta );
     on_change[pin_i] = new OnChange();
   }
@@ -86,35 +88,41 @@ void hzmax_setup() {
 }
 
 void loop() {
+  //plot_a0_loop(); // raw
   //plot_loop(); // see the values we are testing against, esp on_threshold
-  //plot_on_loop(); // watch the touch as a graph, easier to see 
+  //plot_on_loop(); // watch the touch as a graph, easier to see
   touched_loop();
 }
 
 void touched_loop() {
   // the described protocol, sends "0+" etc when touched
   read_pins();
-  for (int pin_i=0; pin_i<TouchesCount; pin_i++) {
+  for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
     boolean on = hzmax[pin_i]->value() > on_threshold;
     if ( on_change[pin_i]->changed(on) ) {
-      print( (char) (TouchLetter + pin_i) );print(on ? "+" : "-");println();
-      }
+      print( (char) (TouchLetter + pin_i) ); print(on ? "+" : "-"); println();
+    }
   }
 }
 
 void plot_on_loop() {
   // 2nd most useful plotting for debugging, just to see the touched/release happen
   read_pins();
-  for (int pin_i=0; pin_i<TouchesCount; pin_i++) {
-  //for (int pin_i=2; pin_i<3; pin_i++) {
+  for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
+    //for (int pin_i=2; pin_i<3; pin_i++) {
     boolean on = hzmax[pin_i]->value() > on_threshold;
     //print( on_threshold - hzmax[pin_i]->value() );print(" ");
-    print( on * 50 + pin_i * 2 );print(" "); // 0|10 with offset so we can see them
+    print( on * 50 + pin_i * 2 ); print(" "); // 0|10 with offset so we can see them
   }
-  print("-2 ");print( 50 + TouchesCount*2);print(" ");
+  print("-2 "); print( 50 + TouchesCount * 2); print(" ");
   //print("1026 ");
   //print(on_threshold);print(" ");
   println();
+}
+
+void plot_a0_loop() {
+  print( analogRead(A0) ); println();
+
 }
 
 void plot_loop() {
@@ -122,12 +130,13 @@ void plot_loop() {
   // Order of plot:
   // commonmode, a0,a1,a2,a3,a4, 1026-mark, threshold-for-on
   read_pins();
-  print(commonmode.value());print(" ");
-  for (int pin_i=0; pin_i<TouchesCount; pin_i++) {
+  print(commonmode.value()); print(" ");
+  for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
+
     print(hzmax[pin_i]->value());
     print(" ");
   }
-  print("1026 ");
+  //print("300 ");
   print(on_threshold);print(" ");
   println();
 }
@@ -135,11 +144,11 @@ void plot_loop() {
 void timeread_loop() {
   // development: to check that read_pins() isn't too slow.
   unsigned long top = millis();
-  for(int i=0;i<1000;i++) {
+  for (int i = 0; i < 1000; i++) {
     read_pins();
-    }
-  println((millis()-top)/1000.0);
   }
+  println((millis() - top) / 1000.0);
+}
 
 void read_pins() {
   // read 'em all
@@ -149,9 +158,9 @@ void read_pins() {
 
   // adjust on_threshold based on commonmode
   int common_value = commonmode.update( commonmode_ratio * analogRead(Common) );
-  on_threshold = (TouchedValue + common_value ) * on_threshold_ratio;
+  on_threshold = 90; // (TouchedValue + common_value ) * on_threshold_ratio;
 
-  for (int pin_i=0; pin_i<TouchesCount; pin_i++) {
+  for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
     int pin = analogRead( Touches[pin_i] );
     int v = hzmax[pin_i]->update( pin );
   }
@@ -161,16 +170,16 @@ void hzmax_loop() {
   // development: one value pin, to play with resistor value.
   // 10Mohm. 450|1000 750 not quite touching. beta of 2 is plenty
   const int Pin = A0;
-  static HzMax hz(1000/60, 2);
+  static HzMax hz(1000 / 60, 2);
 
   int pin = analogRead(Pin);
   int v = hz.update( pin );
 
-  print(v);print(" ");
+  print(v); print(" ");
   print("0 1000");
   println();
 }
-  
+
 
 void peak_loop() {
   // development: checking use of the PeakTrack class, which I decided not to use
@@ -184,12 +193,12 @@ void peak_loop() {
   int common = analogRead(Common);
   int pin = analogRead(Pin);
 
-  a0.update( pin-(common * CommonEx) );
+  a0.update( pin - (common * CommonEx) );
 
-  print(800);print(" ");
+  print(800); print(" ");
   //print(common);print(" ");
   //print(pin);print(" ");
   //print(pin-(common * CommonEx));print(" ");
-  print(a0.value());print(" ");
+  print(a0.value()); print(" ");
   println();
 }
