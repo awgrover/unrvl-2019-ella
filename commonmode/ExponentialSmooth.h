@@ -19,6 +19,7 @@ class ExponentialSmooth {
   int reset(int v) { _smoothed = v; return v;}
 
   // we intend it to inline
+  int update(const int raw_value) { average(raw_value); } // common interface
   int average(const int raw_value) { 
     _smoothed = raw_value / factor + _smoothed - _smoothed / factor; 
     /*

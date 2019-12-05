@@ -59,7 +59,13 @@ const int HzPeriod = 1 / 60.0 * 1000 * 1.1; //rounded is fine. make sure we catc
 const int HzMaxBeta = 5; // we don't seem to need much averaging
 
 // Pins
-int Touches[] = { A0, A1, A2, A3, A4 }; // touch pins to scan (automagic length detect)
+int Touches[] = { A0, A1, A2}; // FIXME: , A3, A4 }; // touch pins to scan (automagic length detect)
+
+// Each pin behaves differently, so determine the "delta" empirically (cf. plot_xover_loop):
+// Delta in plot_xover_loop is about double what it should be in touched_xover_loop()
+int CrossoverDelta[] = { 90, 90, 90, 200, 200 }; // seems to get weaker A0-->>A2 FIXME: (90)
+static_assert(arraysize(Touches) <= arraysize(CrossoverDelta), "Touches list and CrossoverDelta list must be same size");
+
 const int Common = A5; // un attached reference antenna
 
 constexpr int TouchesCount = arraysize(Touches);
@@ -75,8 +81,12 @@ int on_threshold; // dynamically from commonmode
 
 void setup() {
   Serial.begin(115200);
+  println("start");
+
   //hzmax_setup();
   xover_setup();
+
+  println("setup done");
 }
 
 void hzmax_setup() {
@@ -91,25 +101,87 @@ void hzmax_setup() {
 void loop() {
   //plot_a0_loop(); // raw
   //plot_loop(); // see the values we are testing against, esp on_threshold
-  plot_xover_loop();
+
   //plot_on_loop(); // watch the touch as a graph, easier to see
   //touched_loop();
+
+  // using crossover
+  plot_xover_loop();
+  //touched_xover_loop();
 }
 
 CrossOverDetect<HzMax, ExponentialSmooth> *xover[ TouchesCount ];
 const int XOverSlowBeta = 20; // some multiple of HzMaxBeta
 void xover_setup() {
   for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
-    // track peak
+    // for track peak
     HzMax *hzmax = new HzMax( HzPeriod, HzMaxBeta );
-    // track slow peak
+    // for track slow peak
     ExponentialSmooth *slowMax = new ExponentialSmooth( XOverSlowBeta ); // we'll have to update this as xover[].v2.
     // add to crossover detect
-    xover[pin_i] = new CrossOverDetect<HzMax, ExponentialSmooth>( hzmax, slowMax );
+    xover[pin_i] = new CrossOverDetect<HzMax, ExponentialSmooth>( CrossoverDelta[pin_i], hzmax, slowMax );
+  }
+}
+
+void read_xover_pins() {
+  for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
+    //delay(1);
+    int v = analogRead( Touches[pin_i] );
+    // for track peak
+    int peak = xover[pin_i]->v1.update( v );
+    // for the slow follower, for crossover
+    xover[pin_i]->v2.update( peak );
+
+    xover[pin_i]->state(); // need to calculate state
   }
 }
 
 void plot_xover_loop() {
+  //static int ct=0;
+  //const int every=1; // print every
+
+  read_xover_pins();
+
+  for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
+    //if ( !(pin_i == 0 || pin_i==4) ) continue; // skip most
+
+    auto &pinx = *xover[pin_i]; // CrossoverDetect
+    int vfast = pinx.v1.value();
+    int vslow = pinx.v2.value();
+
+    if ( pinx.changed() ) {
+        print(pinx.on() ? (int)(vfast * 1.3) : vfast);print(F(" "));print(pinx.off() ? (int)(vslow * 0.6) : vslow);print(F(" "));  // peak,slow
+        print(pinx.delta);print(F(" "));print(vfast - vslow);print(F(" ")); // delta, actual-delta
+        println();
+    }
+    else {
+      { // if (0== (ct % every)) {
+        print(vfast);print(F(" "));print(vslow);print(F(" ")); // peak,slow
+        print(pinx.delta);print(F(" "));print(vfast - vslow);print(F(" ")); // delta, actual-delta
+        println();
+      }
+    }
+  }
+  //ct += 1;
+}
+
+void touched_xover_loop() {
+  // the described protocol, sends "0+" etc when touched
+  read_xover_pins();
+  for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
+    auto &pinx = *xover[pin_i]; // CrossoverDetect
+
+    // debug values
+    if (pin_i==2) {  // can disable in production
+      if (pinx.current_delta() > 100) { // vary till you get a good value?
+        print(pinx.v1.value());print(F(" "));print(pinx.current_delta());print(F(" ")); print(pinx.on()); println();
+      } 
+    }
+
+    if ( pinx.changed() ) {
+      print( (char) (TouchLetter + pin_i) ); print(pinx.on() ? "+" : "-"); println();
+    }
+  }
 }
 
 void touched_loop() {
