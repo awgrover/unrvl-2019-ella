@@ -63,7 +63,7 @@ int Touches[] = { A0, A1, A2}; // FIXME: , A3, A4 }; // touch pins to scan (auto
 
 // Each pin behaves differently, so determine the "delta" empirically (cf. plot_xover_loop):
 // Delta in plot_xover_loop is about double what it should be in touched_xover_loop()
-int CrossoverDelta[] = { 90, 90, 90, 200, 200 }; // seems to get weaker A0-->>A2 FIXME: (90)
+int CrossoverDelta[] = { 90, 90, 90, 200, 200 }; // seems to get weaker A0-->>A2
 static_assert(arraysize(Touches) <= arraysize(CrossoverDelta), "Touches list and CrossoverDelta list must be same size");
 
 const int Common = A5; // un attached reference antenna
@@ -125,23 +125,18 @@ void xover_setup() {
 
 void read_xover_pins() {
   for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
-    //delay(1);
     int v = analogRead( Touches[pin_i] );
     // for track peak
     int peak = xover[pin_i]->v1.update( v );
     // for the slow follower, for crossover
     xover[pin_i]->v2.update( peak );
-
     xover[pin_i]->state(); // need to calculate state
   }
 }
-
 void plot_xover_loop() {
-  //static int ct=0;
-  //const int every=1; // print every
+  static int ct=0;
 
   read_xover_pins();
-
   for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
     //if ( !(pin_i == 0 || pin_i==4) ) continue; // skip most
 
@@ -152,17 +147,15 @@ void plot_xover_loop() {
     if ( pinx.changed() ) {
         print(pinx.on() ? (int)(vfast * 1.3) : vfast);print(F(" "));print(pinx.off() ? (int)(vslow * 0.6) : vslow);print(F(" "));  // peak,slow
         print(pinx.delta);print(F(" "));print(vfast - vslow);print(F(" ")); // delta, actual-delta
-        println();
+
     }
     else {
-      { // if (0== (ct % every)) {
         print(vfast);print(F(" "));print(vslow);print(F(" ")); // peak,slow
         print(pinx.delta);print(F(" "));print(vfast - vslow);print(F(" ")); // delta, actual-delta
-        println();
-      }
+
     }
   }
-  //ct += 1;
+  println();
 }
 
 void touched_xover_loop() {
@@ -172,12 +165,13 @@ void touched_xover_loop() {
     auto &pinx = *xover[pin_i]; // CrossoverDetect
 
     // debug values
-    if (pin_i==2) {  // can disable in production
-      if (pinx.current_delta() > 100) { // vary till you get a good value?
-        print(pinx.v1.value());print(F(" "));print(pinx.current_delta());print(F(" ")); print(pinx.on()); println();
+    if (false && pin_i==2) {  // can disable in production
+      if (pinx.current_delta() > 100) {
+        print(pinx.delta);print(F(" "));print(pinx.current_delta());print(F(" ")); print(pinx.on()); println();
       } 
     }
 
+    pinx.state(); // calculate state
     if ( pinx.changed() ) {
       print( (char) (TouchLetter + pin_i) ); print(pinx.on() ? "+" : "-"); println();
     }
