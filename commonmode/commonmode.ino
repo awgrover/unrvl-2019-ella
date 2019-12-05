@@ -130,11 +130,16 @@ void read_xover_pins() {
     int peak = xover[pin_i]->v1.update( v );
     // for the slow follower, for crossover
     xover[pin_i]->v2.update( peak );
+
     xover[pin_i]->state(); // need to calculate state
   }
 }
+
 void plot_xover_loop() {
-  static int ct=0;
+  // This is a problem. I was hoping we could plot the values and eyeball things
+  // But, it seems like printing a lot (i.e. serial), causes the analogRead() to behave differently: about x2.
+  // Possibly some kind of uart/interrupt/clock thing?
+  // So, values seen in this function WON'T be the same as seen w/o a lot of printing (e.g. touched_xover_loop)
 
   read_xover_pins();
   for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
@@ -161,6 +166,7 @@ void plot_xover_loop() {
 void touched_xover_loop() {
   // the described protocol, sends "0+" etc when touched
   read_xover_pins();
+
   for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
     auto &pinx = *xover[pin_i]; // CrossoverDetect
 
@@ -171,7 +177,6 @@ void touched_xover_loop() {
       } 
     }
 
-    pinx.state(); // calculate state
     if ( pinx.changed() ) {
       print( (char) (TouchLetter + pin_i) ); print(pinx.on() ? "+" : "-"); println();
     }
@@ -245,6 +250,7 @@ void read_pins() {
   on_threshold = 90; // (TouchedValue + common_value ) * on_threshold_ratio;
 
   for (int pin_i = 0; pin_i < TouchesCount; pin_i++) {
+    analogRead( Touches[pin_i] ); // "dumy" read. UNOS may need this to get good read on 2nd:
     int pin = analogRead( Touches[pin_i] );
     int v = hzmax[pin_i]->update( pin );
   }
